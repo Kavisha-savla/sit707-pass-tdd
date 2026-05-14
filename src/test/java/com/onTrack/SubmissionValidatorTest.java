@@ -3,10 +3,13 @@ package com.onTrack;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
 import java.time.Instant;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SubmissionValidatorTest {
@@ -160,5 +163,58 @@ class SubmissionValidatorTest {
 
         assertFalse(result.isValid());
         assertTrue(result.errors().stream().anyMatch(e -> e.toLowerCase().contains("submittedat")));
+    }
+
+    @Test
+    @DisplayName("BICEP I: validating then breaking one field flips the result (inverse)")
+    void I_validResultRoundTrip() {
+        Submission good = validSubmission();
+        assertTrue(validator.validate(good).isValid(), "baseline must be valid");
+
+        Submission broken = new Submission(
+                "12",
+                good.taskId(),
+                good.content(),
+                good.fileType(),
+                good.submittedAt()
+        );
+        ValidationResult result = validator.validate(broken);
+
+        assertFalse(result.isValid(), "removing the studentId rule must flip validity");
+        assertTrue(
+                result.errors().stream().anyMatch(e -> e.toLowerCase().contains("studentid")),
+                "the inverse must surface exactly the studentId error"
+        );
+    }
+
+    @Test
+    @DisplayName("BICEP C: error count matches the number of broken fields (cross-check)")
+    void C_errorCountMatchesBrokenFieldCount() {
+        Submission allBroken = new Submission(
+                "bad",
+                "TaskOne",
+                "   ",
+                null,
+                null
+        );
+
+        ValidationResult result = validator.validate(allBroken);
+
+        assertFalse(result.isValid(), "all-broken submission must be invalid");
+        assertEquals(5, result.errors().size(),
+                "exactly one error per broken field (studentId, taskId, content, fileType, submittedAt)");
+    }
+
+    @Test
+    @DisplayName("BICEP P: validating 100000 valid submissions completes under 1 second")
+    void P_validate100kSubmissionsUnder1s() {
+        Submission good = validSubmission();
+
+        assertTimeoutPreemptively(Duration.ofSeconds(1), () -> {
+            for (int i = 0; i < 100_000; i++) {
+                ValidationResult r = validator.validate(good);
+                assertTrue(r.isValid());
+            }
+        });
     }
 }

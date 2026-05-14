@@ -15,3 +15,10 @@ out/
 *.log
 .DS_Store
 Thumbs.db
+
+# Internal planning + generated report artefacts (kept local, not for the marker repo)
+PLAN_*.md
+REPORT.md
+REPORT.docx
+REPORT_DISTINCTION.md
+REPORT_DISTINCTION.docx
